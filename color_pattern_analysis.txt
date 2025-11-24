@@ -1,0 +1,50 @@
+================================================================================
+HYPOTHESIS: Checking if mono-colored vs multi-colored matters
+================================================================================
+
+BROKEN VEHICLES:
+  mobilizermech:
+    Colors: 2 (1 colors)
+    Frame: '(mono-colored)'
+  dreadmobile:
+    Colors: 3 (1 colors)
+    Frame: '(mono-colored)'
+  burnerrocket:
+    Colors: 4 (1 colors)
+    Frame: '(mono-colored)'
+  esikaschariot:
+    Colors: 5 (1 colors)
+    Frame: '(mono-colored)'
+
+WORKING VEHICLES:
+  ribskiff:
+    Colors:  (0 colors)
+    Frame: '(mono-colored)'
+  soulshredder:
+    Colors:  (0 colors)
+    Frame: '(mono-colored)'
+  apocalypserunner:
+    Colors: 3,4 (2 colors)
+    Frame: 'gold'
+  carriageofdreams:
+    Colors:  (0 colors)
+    Frame: '(mono-colored)'
+
+================================================================================
+PATTERN ANALYSIS
+================================================================================
+
+BROKEN vehicles:
+  Mono-colored: 4
+  Multi-colored: 0
+
+WORKING vehicles:
+  Mono-colored: 3
+  Multi-colored: 1
+
+⚠️  PATTERN FOUND!
+  ALL broken vehicles are MONO-COLORED
+  WORKING vehicles include MULTI-COLORED cards
+
+  💡 HYPOTHESIS CONFIRMED:
+  Parallax bug affects MONO-COLORED vehicles!

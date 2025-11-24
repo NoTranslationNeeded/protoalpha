@@ -1,0 +1,119 @@
+================================================================================
+VEHICLE COMPARISON: BROKEN vs WORKING
+================================================================================
+
+================================================================================
+BROKEN VEHICLES (Black rules text)
+================================================================================
+
+mobilizermech
+  GrpId: 79489
+  Set: NEO
+  ArtId: 422198
+  SubTypes: 331
+  Tags: 1696804317
+  ArtSize: 0
+  Rarity: 3
+
+dreadmobile
+  GrpId: 90936
+  Set: MH3
+  ArtId: 446030
+  SubTypes: 331
+  Tags: 1696804317
+  ArtSize: 0
+  Rarity: 3
+
+burnerrocket
+  GrpId: 94916
+  Set: DFT
+  ArtId: 450261
+  SubTypes: 331
+  Tags: 1696804317
+  ArtSize: 0
+  Rarity: 2
+
+esikaschariot
+  GrpId: 75214
+  Set: KHM
+  ArtId: 416670
+  SubTypes: 331
+  Tags: 1696804317
+  ArtSize: 0
+  Rarity: 4
+
+================================================================================
+WORKING VEHICLES (White rules text)
+================================================================================
+
+ribskiff
+  GrpId: 83940
+  Set: ONE
+  ArtId: 423913
+  SubTypes: 331
+  Tags: 1696804317
+  ArtSize: 0
+  Rarity: 3
+
+soulshredder
+  GrpId: 95366
+  Set: Y25
+  ArtId: 455584
+  SubTypes: 331
+  Tags: 1696804317
+  ArtSize: 0
+  Rarity: 4
+
+apocalypserunner
+  GrpId: 94990
+  Set: DFT
+  ArtId: 450192
+  SubTypes: 331
+  Tags: 1696804317
+  ArtSize: 0
+  Rarity: 3
+
+carriageofdreams
+  GrpId: 97988
+  Set: OM1
+  ArtId: 461377
+  SubTypes: 331
+  Tags: 1696804317
+  ArtSize: 0
+  Rarity: 2
+
+================================================================================
+PATTERN ANALYSIS
+================================================================================
+
+Broken sets: NEO, MH3, DFT, KHM
+Working sets: ONE, Y25, DFT, OM1
+
+Broken ArtSize values: [0, 0, 0, 0]
+Working ArtSize values: [0, 0, 0, 0]
+
+Broken Rarity values: [3, 3, 2, 4]
+Working Rarity values: [3, 4, 3, 2]
+
+Broken tag counts: [1, 1, 1, 1]
+Working tag counts: [1, 1, 1, 1]
+
+================================================================================
+OTHER STYLES ANALYSIS
+================================================================================
+
+BROKEN:
+  mobilizermech: Parallax only
+  dreadmobile: Parallax only
+  burnerrocket: Parallax only
+  esikaschariot: Parallax only
+
+WORKING:
+  ribskiff: Parallax only
+  soulshredder: Parallax only
+  apocalypserunner: Parallax only
+  carriageofdreams: Parallax only
+
+================================================================================
+KEY FINDINGS
+================================================================================

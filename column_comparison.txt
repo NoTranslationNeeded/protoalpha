@@ -1,0 +1,90 @@
+Comparing Burner Rocket (BROKEN) vs Apocalypse Runner (WORKING)
+Both are DFT set, both are vehicles, both have parallax
+================================================================================
+
+Total columns: 60
+
+GrpId:
+  Burner (broken):     94916
+  Apocalypse (working): 94990
+
+ArtId:
+  Burner (broken):     450261
+  Apocalypse (working): 450192
+
+TitleId:
+  Burner (broken):     879075
+  Apocalypse (working): 879284
+
+FlavorTextId:
+  Burner (broken):     1
+  Apocalypse (working): 879285
+
+ArtistCredit:
+  Burner (broken):     José Parodi
+  Apocalypse (working): Aaron J. Riley
+
+Rarity:
+  Burner (broken):     2
+  Apocalypse (working): 3
+
+CollectorNumber:
+  Burner (broken):     114
+  Apocalypse (working): 188
+
+OldSchoolManaText:
+  Burner (broken):     o1oR
+  Apocalypse (working): o2oBoR
+
+Power:
+  Burner (broken):     3
+  Apocalypse (working): 6
+
+Toughness:
+  Burner (broken):     1
+  Apocalypse (working): 5
+
+Colors:
+  Burner (broken):     4
+  Apocalypse (working): 3,4
+
+ColorIdentity:
+  Burner (broken):     4
+  Apocalypse (working): 3,4
+
+FrameColors:
+  Burner (broken):     4
+  Apocalypse (working): 3,4
+
+AbilityIds:
+  Burner (broken):     7:43,176486:879076,76556:51574
+  Apocalypse (working): 176574:879286,76515:494
+
+AdditionalFrameDetails:
+  Burner (broken):     
+  Apocalypse (working): gold
+
+Order_ColorOrder:
+  Burner (broken):     3
+  Apocalypse (working): 9
+
+Order_ManaCostDifficulty:
+  Burner (broken):     1
+  Apocalypse (working): 2
+
+Order_CMCWithXLast:
+  Burner (broken):     2
+  Apocalypse (working): 4
+
+Order_Title:
+  Burner (broken):     burnerrocket
+  Apocalypse (working): apocalypserunner
+
+Order_MythicToCommon:
+  Burner (broken):     3
+  Apocalypse (working): 2
+
+================================================================================
+
+Total different columns: 20
+Different columns: GrpId, ArtId, TitleId, FlavorTextId, ArtistCredit, Rarity, CollectorNumber, OldSchoolManaText, Power, Toughness, Colors, ColorIdentity, FrameColors, AbilityIds, AdditionalFrameDetails, Order_ColorOrder, Order_ManaCostDifficulty, Order_CMCWithXLast, Order_Title, Order_MythicToCommon

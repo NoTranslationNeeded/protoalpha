@@ -1,0 +1,255 @@
+================================================================================
+Vehicle Card Parallax Analysis
+================================================================================
+
+Total Vehicle cards found: 229
+
+Vehicles WITH parallax: 141
+Vehicles WITHOUT parallax: 88
+
+================================================================================
+VEHICLES WITH PARALLAX (First 20)
+================================================================================
+
+None
+  GrpId: 95931
+  Set: FIN
+  ArtId: 445018
+  ArtSize: 0
+  Rarity: 3
+  Total tags: 1
+  Other styles: None
+
+None
+  GrpId: 96151
+  Set: FIN
+  ArtId: 448421
+  ArtSize: 0
+  Rarity: 4
+  Total tags: 1
+  Other styles: None
+
+None
+  GrpId: 75089
+  Set: KHM
+  ArtId: 414233
+  ArtSize: 0
+  Rarity: 4
+  Total tags: 1
+  Other styles: None
+
+None
+  GrpId: 87170
+  Set: LCI
+  ArtId: 440487
+  ArtSize: 0
+  Rarity: 3
+  Total tags: 1
+  Other styles: None
+
+None
+  GrpId: 87226
+  Set: LCI
+  ArtId: 440495
+  ArtSize: 0
+  Rarity: 3
+  Total tags: 1
+  Other styles: None
+
+None
+  GrpId: 84533
+  Set: MOM
+  ArtId: 429410
+  ArtSize: 0
+  Rarity: 3
+  Total tags: 1
+  Other styles: None
+
+acapennaexpress
+  GrpId: 84115
+  Set: SNC
+  ArtId: 423758
+  ArtSize: 0
+  Rarity: 2
+  Total tags: 1
+  Other styles: None
+
+adventurersairship
+  GrpId: 96130
+  Set: FIN
+  ArtId: 444111
+  ArtSize: 0
+  Rarity: 2
+  Total tags: 1
+  Other styles: None
+
+aethersphereharvest
+  GrpId: 75796
+  Set: KLR
+  ArtId: 400395
+  ArtSize: 0
+  Rarity: 4
+  Total tags: 1
+  Other styles: None
+
+airresponseunit
+  GrpId: 94803
+  Set: DFT
+  ArtId: 450473
+  ArtSize: 0
+  Rarity: 3
+  Total tags: 1
+  Other styles: None
+
+apocalypserunner
+  GrpId: 94990
+  Set: DFT
+  ArtId: 450192
+  ArtSize: 0
+  Rarity: 3
+  Total tags: 1
+  Other styles: None
+
+ballistacharger
+  GrpId: 76380
+  Set: KLR
+  ArtId: 162580
+  ArtSize: 0
+  Rarity: 3
+  Total tags: 1
+  Other styles: None
+
+bespokebattlewagon
+  GrpId: 90901
+  Set: MH3
+  ArtId: 445894
+  ArtSize: 0
+  Rarity: 3
+  Total tags: 1
+  Other styles: None
+
+bomatbazaarbarge
+  GrpId: 75801
+  Set: KLR
+  ArtId: 162573
+  ArtSize: 0
+  Rarity: 3
+  Total tags: 1
+  Other styles: None
+
+boommobile
+  GrpId: 94915
+  Set: DFT
+  ArtId: 452980
+  ArtSize: 0
+  Rarity: 4
+  Total tags: 1
+  Other styles: None
+
+boostedsloop
+  GrpId: 94992
+  Set: DFT
+  ArtId: 450414
+  ArtSize: 0
+  Rarity: 3
+  Total tags: 1
+  Other styles: None
+
+broadcastrambler
+  GrpId: 94808
+  Set: DFT
+  ArtId: 450264
+  ArtSize: 0
+  Rarity: 2
+  Total tags: 1
+  Other styles: None
+
+brutesuit
+  GrpId: 79681
+  Set: NEO
+  ArtId: 422373
+  ArtSize: 0
+  Rarity: 2
+  Total tags: 1
+  Other styles: None
+
+burnerrocket
+  GrpId: 94916
+  Set: DFT
+  ArtId: 450261
+  ArtSize: 0
+  Rarity: 2
+  Total tags: 1
+  Other styles: None
+
+capennaexpress
+  GrpId: 80290
+  Set: SNC
+  ArtId: 423758
+  ArtSize: 0
+  Rarity: 2
+  Total tags: 1
+  Other styles: None
+
+================================================================================
+PATTERN ANALYSIS - Vehicles with Parallax
+================================================================================
+
+By Set:
+  DFT: 41 cards
+  KLR: 14 cards
+  NEO: 13 cards
+  FIN: 9 cards
+  KHM: 6 cards
+  LCI: 6 cards
+  SNC: 6 cards
+  TLA: 6 cards
+  XLN: 5 cards
+  MOM: 3 cards
+  OM1: 3 cards
+  WAR: 3 cards
+  MH3: 2 cards
+  DMU: 2 cards
+  DSK: 2 cards
+  OTJ: 2 cards
+  ONE: 2 cards
+  Y23: 2 cards
+  Y25: 2 cards
+  FDN: 1 cards
+  ELD: 1 cards
+  LTR: 1 cards
+  VOW: 1 cards
+  MKM: 1 cards
+  KLD: 1 cards
+  BLB: 1 cards
+  THB: 1 cards
+  DAR: 1 cards
+  OTP: 1 cards
+  SPG: 1 cards
+  FCA: 1 cards
+
+Tag Count Distribution:
+  1 tag(s): 138 cards
+  2 tag(s): 2 cards
+  3 tag(s): 1 cards
+
+Parallax only: 138
+Parallax + other styles: 3
+
+================================================================================
+VEHICLES WITH MULTIPLE STYLES (First 10)
+================================================================================
+
+unlicensedhearse (OTP)
+  Tags: -657773077,1696804317
+
+skysovereignconsul (SPG)
+  Tags: -1882537866,1696804317
+
+smugglerscopter (FCA)
+  Tags: -1882537866,-1785849596,1696804317
+
+================================================================================
+By ArtSize:
+  ArtSize 0: 139 cards
+  ArtSize 2: 2 cards

@@ -1,0 +1,10 @@
+.venv
+__pycache__
+*.pyc
+uitesting.py
+output
+dist
+build
+*.spec
+exported_changes.json
+.vscode/
