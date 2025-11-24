@@ -1,4 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
+import asyncio
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import sys
@@ -14,6 +16,86 @@ from src import sql_editor, card_models
 from src.sql_editor import find_mtga_db_path
 
 router = APIRouter()
+
+@router.get("/system/browse")
+async def browse_path(type: str = "file"):
+    """
+    Opens a native file dialog to select a file or folder using PowerShell.
+    type: "file" or "folder"
+    """
+    import subprocess
+    
+    try:
+        cmd = ""
+        if type == "file":
+            # Use a more robust PowerShell script that forces the dialog to the front
+            cmd = """
+            Add-Type -AssemblyName System.Windows.Forms
+            $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog
+            $FileBrowser.Title = "Select MTGA Database File"
+            $FileBrowser.Filter = "MTGA Database (*.mtga)|*.mtga|All Files (*.*)|*.*"
+            $FileBrowser.InitialDirectory = [Environment]::GetFolderPath("MyDocuments")
+            
+            # Hack to ensure dialog shows on top
+            $Form = New-Object System.Windows.Forms.Form
+            $Form.TopMost = $true
+            $Form.StartPosition = "Manual"
+            $Form.ShowInTaskbar = $false
+            $Form.Opacity = 0
+            $Form.Show()
+            $Form.Focus()
+            
+            $result = $FileBrowser.ShowDialog($Form)
+            if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+                Write-Output $FileBrowser.FileName
+            }
+            $Form.Close()
+            $Form.Dispose()
+            """
+        else:
+            cmd = """
+            Add-Type -AssemblyName System.Windows.Forms
+            $FolderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+            $FolderBrowser.Description = "Select Image Save Folder"
+            
+            # Hack to ensure dialog shows on top
+            $Form = New-Object System.Windows.Forms.Form
+            $Form.TopMost = $true
+            $Form.StartPosition = "Manual"
+            $Form.ShowInTaskbar = $false
+            $Form.Opacity = 0
+            $Form.Show()
+            $Form.Focus()
+            
+            $result = $FolderBrowser.ShowDialog($Form)
+            if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+                Write-Output $FolderBrowser.SelectedPath
+            }
+            $Form.Close()
+            $Form.Dispose()
+            """
+            
+        # Run PowerShell command with timeout
+        result = subprocess.run(
+            ["powershell", "-Command", cmd], 
+            capture_output=True, 
+            text=True, 
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            timeout=60 # 60 second timeout to prevent hanging
+        )
+        
+        path = result.stdout.strip()
+        
+        if path:
+            return {"path": path}
+        return {"path": None}
+        
+    except subprocess.TimeoutExpired:
+        print("File dialog timed out")
+        return {"path": None}
+    except Exception as e:
+        print(f"Error opening file dialog: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Configuration Paths
 USER_CONFIG_DIR = Path.home() / ".mtga_swapper"
@@ -34,8 +116,20 @@ def get_db_connection():
              return None
              
         try:
+            # Create connection
             db_cursor, db_connection, _ = sql_editor.create_database_connection(current_db_path)
-            print("Database connection successful")
+            
+            # Validate connection by querying Cards table
+            try:
+                db_cursor.execute("SELECT 1 FROM Cards LIMIT 1")
+                print("Database connection successful and validated")
+            except sqlite3.Error as e:
+                print(f"Database validation failed: {e}")
+                db_connection.close()
+                db_connection = None
+                db_cursor = None
+                return None
+                
         except Exception as e:
             print(f"Error connecting to DB: {e}")
             return None
@@ -60,36 +154,32 @@ def init_config():
             config = json.load(f)
             db_path = config.get("DatabasePath")
             if db_path:
-                # Sanitize path
-                db_path = db_path.strip().strip('"').strip("'").replace(">", os.sep)
-            current_db_path = db_path
+                # Sanitize path: remove "True" prefix if present (from previous bug) and whitespace
+                db_path = db_path.replace("True", "").strip()
+                current_db_path = db_path
+                # Attempt connection on init
+                get_db_connection()
     except Exception as e:
         print(f"Error loading config: {e}")
 
-# Initialize on module load
+# Initialize config on startup
 init_config()
+
+@router.get("/config")
+async def get_config():
+    global current_db_path
+    
+    # Check connection status
+    is_connected = get_db_connection() is not None
+    
+    return {
+        "database_path": current_db_path,
+        "is_db_connected": is_connected
+    }
 
 class ConfigModel(BaseModel):
     database_path: Optional[str]
     save_path: Optional[str]
-
-class CardModel(BaseModel):
-    name: str
-    set_code: str
-    art_type: str
-    grp_id: str
-    art_id: str
-
-@router.get("/config")
-async def get_config():
-    if USER_CONFIG_FILE.exists():
-        with open(USER_CONFIG_FILE, "r") as f:
-            data = json.load(f)
-            return {
-                "database_path": data.get("DatabasePath", ""),
-                "save_path": data.get("SavePath", "")
-            }
-    return {"database_path": "", "save_path": ""}
 
 @router.post("/config")
 async def update_config(config: ConfigModel):
@@ -108,7 +198,9 @@ async def update_config(config: ConfigModel):
     
     if config.database_path is not None:
         # Sanitize path: remove quotes, whitespace, and fix common typos like '>'
+        # Also remove "True" prefix if present (from previous bug)
         clean_path = config.database_path.strip().strip('"').strip("'")
+        clean_path = clean_path.replace("True", "").strip()
         clean_path = clean_path.replace(">", os.sep)
         
         current_data["DatabasePath"] = clean_path
@@ -145,6 +237,12 @@ async def get_cards(
     if not cursor:
         raise HTTPException(status_code=500, detail="Database not connected")
         
+    # DEBUG: Print table info
+    try:
+        print("Cards Table Columns:", [row[1] for row in cursor.execute("PRAGMA table_info(Cards)").fetchall()])
+    except:
+        pass
+        
     query = """
         SELECT 
             CASE 
@@ -155,11 +253,15 @@ async def get_cards(
             c1.ExpansionCode,
             c1.ArtSize,
             c1.GrpId,
-            c1.ArtId
+            c1.ArtId,
+            MAX(lko.Loc) AS KoreanName,
+            c1.IsDigitalOnly,
+            c1.IsRebalanced
         FROM Cards c1
         LEFT JOIN Cards c2
             ON c1.LinkedFaceGrpIds = c2.GrpId
         AND NULLIF(c2.Order_Title, '') IS NOT NULL
+        LEFT JOIN Localizations_koKR lko ON c1.TitleId = lko.LocId
         WHERE (NULLIF(c1.Order_Title, '') IS NOT NULL
         OR NULLIF(c2.Order_Title, '') IS NOT NULL)
     """
@@ -172,12 +274,16 @@ async def get_cards(
                 c2.Order_Title LIKE ? OR
                 c1.ExpansionCode LIKE ? OR 
                 c1.GrpId LIKE ? OR 
-                c1.ArtId LIKE ?
+                c1.ArtId LIKE ? OR
+                lko.Loc LIKE ?
             )
         """
         search_term = f"%{search}%"
-        # We now have 5 placeholders
-        params.extend([search_term, search_term, search_term, search_term, search_term])
+        # We now have 6 placeholders (added Korean localization)
+        params.extend([search_term, search_term, search_term, search_term, search_term, search_term])
+        
+    # Add grouping to ensure unique cards
+    query += " GROUP BY c1.GrpId, c1.ArtId"
         
     # Add sorting
     # "Name", "Set", "ArtType", "GrpID", "ArtID"
@@ -203,12 +309,20 @@ async def get_cards(
         
         cards = []
         for row in rows:
+            name = row[0]
+            set_code = row[1]
+            # Identify Alchemy cards using IsDigitalOnly or IsRebalanced columns
+            # row[6] is IsDigitalOnly, row[7] is IsRebalanced (1 or 0)
+            is_alchemy = bool(row[6]) or bool(row[7])
+            
             cards.append({
-                "name": row[0],
-                "set_code": row[1],
+                "name": name,
+                "set_code": set_code,
                 "art_type": str(row[2]),
                 "grp_id": str(row[3]),
-                "art_id": str(row[4])
+                "art_id": str(row[4]),
+                "korean_name": row[5] if len(row) > 5 and row[5] else None,
+                "is_alchemy": is_alchemy
             })
             
         return {"cards": cards, "count": len(cards)}
@@ -472,6 +586,207 @@ async def unlock_batch_card_style(search: Optional[str] = None):
         print(f"Batch unlock error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/cards/style/unlock-batch-stream")
+async def unlock_batch_card_style_stream(search: Optional[str] = None):
+    """
+    SSE endpoint for batch unlock with real-time progress updates
+    """
+    from fastapi.responses import StreamingResponse
+    import asyncio
+    
+    async def generate_progress():
+        global current_db_path, db_connection, db_cursor
+        
+        try:
+            if not current_db_path:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Database not configured'})}\n\n"
+                return
+                
+            cursor = get_db_connection()
+            if not cursor:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Database not connected'})}\n\n"
+                return
+            
+            # Find cards matching search criteria
+            query = """
+                SELECT c1.GrpId, c1.Order_Title
+                FROM Cards c1
+                LEFT JOIN Cards c2
+                    ON c1.LinkedFaceGrpIds = c2.GrpId
+                AND NULLIF(c2.Order_Title, '') IS NOT NULL
+                WHERE (NULLIF(c1.Order_Title, '') IS NOT NULL
+                OR NULLIF(c2.Order_Title, '') IS NOT NULL)
+            """
+            
+            params = []
+            if search:
+                query += """
+                    AND (
+                        c1.Order_Title LIKE ? OR 
+                        c2.Order_Title LIKE ? OR
+                        c1.ExpansionCode LIKE ? OR 
+                        c1.GrpId LIKE ? OR 
+                        c1.ArtId LIKE ?
+                    )
+                """
+                search_term = f"%{search}%"
+                params.extend([search_term, search_term, search_term, search_term, search_term])
+            
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            
+            # Filter out basic lands
+            basic_lands = ["island", "forest", "mountain", "plains", "wastes", "swamp"]
+            target_grp_ids = []
+            
+            for row in rows:
+                grp_id = str(row[0])
+                name = str(row[1]).lower()
+                is_basic_land = any(name.startswith(land) for land in basic_lands)
+                if not is_basic_land:
+                    target_grp_ids.append(grp_id)
+            
+            total_cards = len(target_grp_ids)
+            
+            if total_cards == 0:
+                yield f"data: {json.dumps({'type': 'complete', 'total': 0, 'message': 'No eligible cards found to unlock'})}\n\n"
+                return
+            
+            # Send initial progress
+            yield f"data: {json.dumps({'type': 'progress', 'current': 0, 'total': total_cards, 'message': 'Starting...'})}\n\n"
+            await asyncio.sleep(0)  # Allow event to be sent
+            
+            # Setup paths
+            user_save_changes_path = USER_CONFIG_DIR / "changes.json"
+            if not user_save_changes_path.exists():
+                with open(user_save_changes_path, "w") as f:
+                    json.dump({}, f)
+            
+            asset_bundle_path = str(Path(current_db_path).parent.parent / "AssetBundle")
+            backup_dir = Path.home() / "MTGA_Swapper_Backups"
+            backup_dir.mkdir(exist_ok=True)
+            
+            # Process in chunks
+            chunk_size = 100
+            total_processed = 0
+            failed_chunks = 0
+            
+            for i in range(0, len(target_grp_ids), chunk_size):
+                chunk = target_grp_ids[i:i + chunk_size]
+                try:
+                    success = sql_editor.unlock_parallax_style(
+                        chunk, 
+                        cursor, 
+                        db_connection, 
+                        str(user_save_changes_path),
+                        asset_bundle_path
+                    )
+                    if success:
+                        total_processed += len(chunk)
+                    else:
+                        failed_chunks += 1
+                    
+                    # Send progress update
+                    progress_pct = int((total_processed / total_cards) * 100)
+                    yield f"data: {json.dumps({'type': 'progress', 'current': total_processed, 'total': total_cards, 'percentage': progress_pct, 'message': f'Processing... {total_processed}/{total_cards}'})}\n\n"
+                    await asyncio.sleep(0)  # Allow event to be sent
+                    
+                except Exception as e:
+                    print(f"Error unlocking chunk {i//chunk_size}: {e}")
+                    failed_chunks += 1
+            
+            # Send completion
+            if total_processed > 0:
+                msg = f"Unlocked styles for {total_processed} cards."
+                if failed_chunks > 0:
+                    msg += f" (Failed to process {failed_chunks} batches)"
+                yield f"data: {json.dumps({'type': 'complete', 'total': total_processed, 'message': msg})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Failed to unlock styles (all batches failed)'})}\n\n"
+                
+        except Exception as e:
+            print(f"SSE Batch unlock error: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+    
+    return StreamingResponse(generate_progress(), media_type="text/event-stream")
+
+
+@router.get("/cards/style/reset-tokens-stream")
+async def reset_token_styles_stream():
+    """SSE endpoint for resetting token card styles with progress"""
+    global current_db_path, db_connection, db_cursor
+    
+    async def generate_progress():
+        try:
+            if not current_db_path:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Database not configured'})}\n\n"
+                return
+                
+            cursor = get_db_connection()
+            if not cursor:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Failed to connect to database'})}\n\n"
+                return
+            
+            # Get all token cards
+            cursor.execute("SELECT GrpId FROM Cards WHERE IsToken = 1")
+            target_grp_ids = [row[0] for row in cursor.fetchall()]
+            total_cards = len(target_grp_ids)
+            
+            if total_cards == 0:
+                yield f"data: {json.dumps({'type': 'complete', 'total': 0, 'message': 'No token cards found'})}\n\n"
+                return
+            
+            # Process in chunks
+            chunk_size = 100
+            total_processed = 0
+            failed_chunks = 0
+            
+            for i in range(0, len(target_grp_ids), chunk_size):
+                chunk = target_grp_ids[i:i + chunk_size]
+                try:
+                    placeholders = ','.join('?' * len(chunk))
+                    update_query = f"""
+                        UPDATE Cards
+                        SET tags = CASE
+                            WHEN tags = ',1696804317,' THEN ',,'
+                            WHEN tags LIKE ',1696804317,%' THEN REPLACE(tags, ',1696804317,', ',')
+                            WHEN tags LIKE '%,1696804317,' THEN REPLACE(tags, ',1696804317,', ',')
+                            ELSE tags
+                        END
+                        WHERE GrpId IN ({placeholders})
+                        AND tags LIKE '%1696804317%'
+                    """
+                    cursor.execute(update_query, chunk)
+                    db_connection.commit()
+                    rows_affected = cursor.rowcount
+                    total_processed += rows_affected
+                    
+                    # Send progress update
+                    progress_pct = round((total_processed / total_cards) * 100, 1)
+                    yield f"data: {json.dumps({'type': 'progress', 'current': total_processed, 'total': total_cards, 'percentage': progress_pct, 'message': f'Processing... {total_processed}/{total_cards}'})}\n\n"
+                    await asyncio.sleep(0)
+                    
+                except Exception as e:
+                    print(f"Chunk processing error: {e}")
+                    failed_chunks += 1
+            
+            # Send completion
+            if total_processed > 0:
+                msg = f"Reset styles for {total_processed} token cards."
+                if failed_chunks > 0:
+                    msg += f" (Failed to process {failed_chunks} batches)"
+                yield f"data: {json.dumps({'type': 'complete', 'total': total_processed, 'message': msg})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'complete', 'total': 0, 'message': 'No token cards needed resetting (already clean).'})}\n\n"
+                
+        except Exception as e:
+            print(f"SSE Reset tokens error: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+    
+    return StreamingResponse(generate_progress(), media_type="text/event-stream")
+
+
+
 @router.post("/cards/style/unlock-tokens")
 async def unlock_token_styles():
     global current_db_path, db_connection, db_cursor
@@ -645,6 +960,90 @@ async def reset_token_styles():
         print(f"Token reset error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/cards/style/reset-all-parallax")
+async def reset_all_parallax_styles():
+    """
+    Reset parallax style for ALL cards in the database.
+    This removes the parallax tag (1696804317) from every card.
+    """
+    global current_db_path, db_connection, db_cursor
+    
+    if not current_db_path:
+        raise HTTPException(status_code=400, detail="Database not configured")
+        
+    cursor = get_db_connection()
+    if not cursor:
+        raise HTTPException(status_code=500, detail="Database not connected")
+        
+    try:
+        # Find all cards with parallax style
+        query = """
+            SELECT GrpId, tags
+            FROM Cards
+            WHERE tags LIKE '%1696804317%'
+        """
+        
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        
+        print(f"Found {len(rows)} cards with parallax style")
+        
+        if not rows:
+            return {
+                "status": "success", 
+                "message": "No cards with parallax style found.", 
+                "count": 0
+            }
+        
+        target_grp_ids = [str(row[0]) for row in rows]
+        
+        # Reset the parallax style tag for all cards
+        chunk_size = 900
+        total_processed = 0
+        failed_chunks = 0
+        
+        for i in range(0, len(target_grp_ids), chunk_size):
+            chunk = target_grp_ids[i:i + chunk_size]
+            try:
+                placeholders = ','.join(['?'] * len(chunk))
+                update_query = f"""
+                    UPDATE Cards
+                    SET tags = CASE
+                        WHEN tags = '1696804317' THEN ''
+                        WHEN tags LIKE '1696804317,%' THEN SUBSTR(tags, LENGTH('1696804317,') + 1)
+                        WHEN tags LIKE '%,1696804317' THEN SUBSTR(tags, 1, LENGTH(tags) - LENGTH(',1696804317'))
+                        ELSE REPLACE(tags, ',1696804317,', ',')
+                    END
+                    WHERE GrpId IN ({placeholders})
+                """
+                
+                cursor.execute(update_query, chunk)
+                db_connection.commit()
+                total_processed += len(chunk)
+                print(f"Processed chunk {i//chunk_size + 1}: {len(chunk)} cards")
+            except Exception as chunk_error:
+                print(f"Error processing chunk {i//chunk_size + 1}: {chunk_error}")
+                failed_chunks += 1
+                continue
+        
+        if total_processed > 0:
+            return {
+                "status": "success",
+                "message": f"Successfully reset parallax style for {total_processed} cards. Failed chunks: {failed_chunks}",
+                "count": total_processed
+            }
+        else:
+            return {
+                "status": "success", 
+                "message": f"No changes made. Found {len(target_grp_ids)} cards with parallax but none were updated.", 
+                "count": 0
+            }
+            
+    except Exception as e:
+        print(f"Reset all parallax error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/cards/style/reset-colored-vehicles")
 async def reset_colored_vehicle_styles():
     """
@@ -757,4 +1156,164 @@ async def reset_colored_vehicle_styles():
     except Exception as e:
         print(f"Colored vehicle reset error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/cards/style/reset-colored-vehicles-stream")
+async def reset_colored_vehicle_styles_stream():
+    """SSE endpoint for resetting colored vehicle card styles with progress"""
+    global current_db_path, db_connection, db_cursor
+    
+    async def generate_progress():
+        try:
+            if not current_db_path:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Database not configured'})}\n\n"
+                return
+                
+            cursor = get_db_connection()
+            if not cursor:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Failed to connect to database'})}\n\n"
+                return
+            
+            # Get all mono-colored vehicles with parallax style
+            query = """
+                SELECT GrpId
+                FROM Cards
+                WHERE SubTypes LIKE '%331%'
+                AND tags LIKE '%1696804317%'
+                AND Colors IS NOT NULL
+                AND Colors != ''
+                AND Colors NOT LIKE '%,%'
+            """
+            cursor.execute(query)
+            target_grp_ids = [str(row[0]) for row in cursor.fetchall()]
+            total_cards = len(target_grp_ids)
+            
+            if total_cards == 0:
+                yield f"data: {json.dumps({'type': 'complete', 'total': 0, 'message': 'No colored vehicles with parallax found'})}\n\n"
+                return
+            
+            # Process in chunks
+            chunk_size = 100
+            total_processed = 0
+            failed_chunks = 0
+            
+            for i in range(0, len(target_grp_ids), chunk_size):
+                chunk = target_grp_ids[i:i + chunk_size]
+                try:
+                    placeholders = ','.join('?' * len(chunk))
+                    update_query = f"""
+                        UPDATE Cards
+                        SET tags = CASE
+                            WHEN tags = ',1696804317,' THEN ',,'
+                            WHEN tags LIKE ',1696804317,%' THEN REPLACE(tags, ',1696804317,', ',')
+                            WHEN tags LIKE '%,1696804317,' THEN REPLACE(tags, ',1696804317,', ',')
+                            ELSE tags
+                        END
+                        WHERE GrpId IN ({placeholders})
+                        AND tags LIKE '%1696804317%'
+                    """
+                    cursor.execute(update_query, chunk)
+                    db_connection.commit()
+                    rows_affected = cursor.rowcount
+                    total_processed += rows_affected
+                    
+                    # Send progress update
+                    progress_pct = round((total_processed / total_cards) * 100, 1)
+                    yield f"data: {json.dumps({'type': 'progress', 'current': total_processed, 'total': total_cards, 'percentage': progress_pct, 'message': f'Processing... {total_processed}/{total_cards}'})}\n\n"
+                    await asyncio.sleep(0)
+                    
+                except Exception as e:
+                    print(f"Chunk processing error: {e}")
+                    failed_chunks += 1
+            
+            # Send completion
+            if total_processed > 0:
+                msg = f"Reset Parallax for {total_processed} colored mono-colored vehicle cards."
+                if failed_chunks > 0:
+                    msg += f" (Failed to process {failed_chunks} batches)"
+                yield f"data: {json.dumps({'type': 'complete', 'total': total_processed, 'message': msg})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'complete', 'total': 0, 'message': 'No colored vehicles needed resetting (already clean).'})}\n\n"
+                
+        except Exception as e:
+            print(f"SSE Reset colored vehicles error: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+    
+    return StreamingResponse(generate_progress(), media_type="text/event-stream")
+
+
+@router.get("/cards/style/reset-all-parallax-stream")
+async def reset_all_parallax_stream():
+    """SSE endpoint for resetting all parallax styles with progress"""
+    global current_db_path, db_connection, db_cursor
+    
+    async def generate_progress():
+        try:
+            if not current_db_path:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Database not configured'})}\n\n"
+                return
+                
+            cursor = get_db_connection()
+            if not cursor:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Failed to connect to database'})}\n\n"
+                return
+            
+            # Get all cards with parallax style
+            query = "SELECT DISTINCT GrpId FROM Cards WHERE tags LIKE '%1696804317%'"
+            cursor.execute(query)
+            target_grp_ids = [str(row[0]) for row in cursor.fetchall()]
+            total_cards = len(target_grp_ids)
+            
+            if total_cards == 0:
+                yield f"data: {json.dumps({'type': 'complete', 'total': 0, 'message': 'No cards with parallax style found'})}\n\n"
+                return
+            
+            # Process in chunks
+            chunk_size = 100
+            total_processed = 0
+            failed_chunks = 0
+            
+            for i in range(0, len(target_grp_ids), chunk_size):
+                chunk = target_grp_ids[i:i + chunk_size]
+                try:
+                    placeholders = ','.join('?' * len(chunk))
+                    update_query = f"""
+                        UPDATE Cards
+                        SET tags = CASE
+                            WHEN tags = ',1696804317,' THEN ',,'
+                            WHEN tags LIKE ',1696804317,%' THEN REPLACE(tags, ',1696804317,', ',')
+                            WHEN tags LIKE '%,1696804317,' THEN REPLACE(tags, ',1696804317,', ',')
+                            ELSE tags
+                        END
+                        WHERE GrpId IN ({placeholders})
+                        AND tags LIKE '%1696804317%'
+                    """
+                    cursor.execute(update_query, chunk)
+                    db_connection.commit()
+                    rows_affected = cursor.rowcount
+                    total_processed += rows_affected
+                    
+                    # Send progress update
+                    progress_pct = round((total_processed / total_cards) * 100, 1)
+                    yield f"data: {json.dumps({'type': 'progress', 'current': total_processed, 'total': total_cards, 'percentage': progress_pct, 'message': f'Processing... {total_processed}/{total_cards}'})}\n\n"
+                    await asyncio.sleep(0)
+                    
+                except Exception as e:
+                    print(f"Chunk processing error: {e}")
+                    failed_chunks += 1
+            
+            # Send completion
+            if total_processed > 0:
+                msg = f"Reset Parallax for {total_processed} cards."
+                if failed_chunks > 0:
+                    msg += f" (Failed to process {failed_chunks} batches)"
+                yield f"data: {json.dumps({'type': 'complete', 'total': total_processed, 'message': msg})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'complete', 'total': 0, 'message': 'No cards needed resetting (already clean).'})}\n\n"
+                
+        except Exception as e:
+            print(f"SSE Reset all parallax error: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+    
+    return StreamingResponse(generate_progress(), media_type="text/event-stream")
 

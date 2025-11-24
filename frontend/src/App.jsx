@@ -12,6 +12,7 @@ function App() {
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedCard, setSelectedCard] = useState(null);
+  const [language, setLanguage] = useState('ko'); // 'en' or 'ko'
 
   useEffect(() => {
     fetchConfig();
@@ -33,10 +34,28 @@ function App() {
       {/* Header / Navigation */}
       {/* Header / Navigation */}
       <nav className="glass-panel sticky top-4 mx-4 mb-6 p-4 z-50 flex justify-between items-center">
-        {/* Left: DB Status */}
-        <div className="flex justify-start">
-          <div className="text-xs text-[var(--text-muted)]">
-            {config?.database_path ? 'DB Connected' : 'No DB'}
+        {/* Left: DB Status and Language Toggle */}
+        <div className="flex items-center gap-4">
+          <div className={`text-sm font-semibold ${config?.is_db_connected ? 'text-green-500' : 'text-red-500'}`}>
+            {config?.is_db_connected ? (language === 'ko' ? 'DB 연결됨' : 'DB Connected') : (language === 'ko' ? 'DB 연결 안 됨' : 'No DB Connection')}
+          </div>
+          
+          {/* Language Toggle Flags */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setLanguage('en')}
+              className={`text-2xl transition-all ${language === 'en' ? 'scale-125' : 'opacity-50 hover:opacity-100'}`}
+              title="English"
+            >
+              🇺🇸
+            </button>
+            <button
+              onClick={() => setLanguage('ko')}
+              className={`text-2xl transition-all ${language === 'ko' ? 'scale-125' : 'opacity-50 hover:opacity-100'}`}
+              title="한국어"
+            >
+              🇰🇷
+            </button>
           </div>
         </div>
 
@@ -46,13 +65,13 @@ function App() {
             onClick={() => setActiveTab('browser')}
             className={`btn ${activeTab === 'browser' ? 'btn-primary' : 'btn-ghost'} text-lg`}
           >
-            Card Browser
+            {language === 'ko' ? '카드 브라우저' : 'Card Browser'}
           </button>
           <button 
             onClick={() => setActiveTab('settings')}
             className={`btn ${activeTab === 'settings' ? 'btn-primary' : 'btn-ghost'} text-lg`}
           >
-            Settings
+            {language === 'ko' ? '설정' : 'Settings'}
           </button>
         </div>
       </nav>
@@ -68,11 +87,12 @@ function App() {
             {activeTab === 'browser' && (
               <CardBrowser 
                 apiUrl={API_URL} 
-                onSelectCard={setSelectedCard} 
+                onSelectCard={setSelectedCard}
+                language={language}
               />
             )}
             {activeTab === 'settings' && (
-              <Settings apiUrl={API_URL} />
+              <Settings apiUrl={API_URL} onConfigUpdate={fetchConfig} language={language} />
             )}
           </div>
         )}
@@ -83,7 +103,8 @@ function App() {
         <AssetEditor 
           card={selectedCard} 
           onClose={() => setSelectedCard(null)} 
-          apiUrl={API_URL} 
+          apiUrl={API_URL}
+          language={language}
         />
       )}
     </div>
